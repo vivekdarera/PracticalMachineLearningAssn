@@ -1,0 +1,80 @@
+---
+title: "Practical Machine Learning Assignment"
+author: "Viv"
+date: "Friday, April 10, 2015"
+output: html_document
+---
+# Introduction
+
+This is the Human Activity Recognition (HAR) assignment, where the objective is to determine if participants did a given set of exercises correctly. The 'classe' variable tells us if this was done correctly and takes on 5 values: 
+
+* exactly according to the specification (Class A) , 
+* throwing the elbows to the front (Class B), 
+* lifting the dumbbell only halfway (Class C), 
+* lowering the dumbbell only halfway (Class D) and 
+* throwing the hips to the front (Class E).
+
+# Loading and cleaning the data
+
+First, we will load the data and clean it. We see that there are many columns where only 'NA' are present. These columns add no value to the model and hence will be removed. 
+```{r message=FALSE, warning=FALSE}
+library(caret)
+set.seed(1000)
+data <- read.csv("./pml-training.csv", na.strings = c("NA", "" , "#DIV/0!"), colClasses = c(NA,NULL))
+data <- read.csv("./pml-training.csv", na.strings = c("NA", "" , "#DIV/0!"))
+validation <- read.csv("./pml-testing.csv")
+goodcols <- "NULL"
+goodcols[1:160] <- "NULL"
+for(i in 1:160)
+    if(sum(is.na(data[,i]))==0)
+        if(sum(is.na(validation[,i])) == 0 )
+            goodcols[i]= NA
+
+cleandata <- read.csv("./pml-training.csv", na.strings = c("NA", "" , "#DIV/0!"), colClasses = goodcols)
+```
+
+In addition, the first 7 columns of the data contain names, and timestamps, which are not relevant to the model. Hence we remove them.
+
+```{r message=FALSE, warning=FALSE}
+cleandata <- cleandata[,- c(1,2,3,4,5,6,7)]
+```
+
+# Cross Validation and model building
+Now, we do a 5 fold crossvalidation and build a qda model. Other models like random forests etc. take too much time to build, the qda model is a good compromise since it is really fast. 
+
+
+```{r message=FALSE, warning=FALSE}
+#Doing cross validation
+
+trainctrl <- trainControl(method = "cv", number = 5, allowParallel = TRUE)
+modelqdacv <- train(classe~., method = "qda", data = cleandata, trControl = trainctrl)
+predictionqda <- predict(modelqdacv, newdata = cleandata)
+conf <- confusionMatrix(cleandata$classe, predictionqda)
+conf
+```
+
+# Insample error and expected Out of Sample Error
+
+We see that the qda model has given an **in-sample** accuracy of approximately 90% on the data. **We expect the out of sample error to be slightly more than this value**. This is because in-sample error is the error on the data that was used for tranining itself, and for any other data, the error is typically more.
+
+
+# File generation
+Now, we generate the files using code provided in the assignment to validate on the unknown cases.
+
+```{r message=FALSE, warning=FALSE}
+
+answers <- predict(modelqdacv,newdata=validation)
+
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+
+pml_write_files(answers)
+
+```
+
